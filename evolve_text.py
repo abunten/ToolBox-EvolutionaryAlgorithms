@@ -1,12 +1,9 @@
 """
 Evolutionary algorithm, attempts to evolve a given message string.
-
 Uses the DEAP (Distributed Evolutionary Algorithms in Python) framework,
 http://deap.readthedocs.org
-
 Usage:
     python evolve_text.py [goal_message]
-
 Full instructions are at:
 https://sites.google.com/site/sd15spring/home/project-toolbox/evolutionary-algorithms
 """
@@ -14,7 +11,7 @@ https://sites.google.com/site/sd15spring/home/project-toolbox/evolutionary-algor
 import random
 import string
 
-import numpy    # Used for statistics
+import numpy as np    # Used for statistics
 from deap import algorithms
 from deap import base
 from deap import tools
@@ -47,14 +44,12 @@ class FitnessMinimizeSingle(base.Fitness):
 class Message(list):
     """
     Representation of an individual Message within the population to be evolved
-
     We represent the Message as a list of characters (mutable) so it can
     be more easily manipulated by the genetic operators.
     """
     def __init__(self, starting_string=None, min_length=4, max_length=30):
         """
         Create a new Message individual.
-
         If starting_string is given, initialize the Message with the
         provided string message. Otherwise, initialize to a random string
         message with length between min_length and max_length.
@@ -92,8 +87,25 @@ class Message(list):
 # Genetic operators
 # -----------------------------------------------------------------------------
 
-# TODO: Implement levenshtein_distance function (see Day 9 in-class exercises)
-# HINT: Now would be a great time to implement memoization if you haven't
+def levenshtein_distance(s1, s2):
+
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    prevrow = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        currow = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = prevrow[j + 1] + 1 # j+1 instead of j since previous_row and current_row are one character longer
+            deletions = currow[j] + 1       # than s2
+            substitutions = prevrow[j] + (c1 != c2)
+            currow.append(min(insertions, deletions, substitutions))
+        prevrow = currow
+
+    return prevrow[-1]
 
 def evaluate_text(message, goal_text, verbose=VERBOSE):
     """
@@ -111,7 +123,6 @@ def mutate_text(message, prob_ins=0.05, prob_del=0.05, prob_sub=0.05):
     """
     Given a Message and independent probabilities for each mutation type,
     return a length 1 tuple containing the mutated Message.
-
     Possible mutations are:
         Insertion:      Insert a random (legal) character somewhere into
                         the Message
@@ -119,17 +130,25 @@ def mutate_text(message, prob_ins=0.05, prob_del=0.05, prob_sub=0.05):
         Substitution:   Replace one character of the Message with a random
                         (legal) character
     """
-
     if random.random() < prob_ins:
-        # TODO: Implement insertion-type mutation
-        pass
+        m = list(message)
+        i = random.randint(0, len(m) - 1)
+        m.insert(i, random.choice(VALID_CHARS))
+        message = ''.join(m)
 
-    # TODO: Also implement deletion and substitution mutations
-    # HINT: Message objects inherit from list, so they also inherit
-    #       useful list methods
-    # HINT: You probably want to use the VALID_CHARS global variable
+    if random.random() < prob_del:
+        m = list(message)
+        i = random.randint(0, len(m) - 1)
+        m.pop(i)
+        message = ''.join(m)
 
-    return (message, )   # Length 1 tuple, required by DEAP
+    if random.random() < prob_sub:
+        m = list(message)
+        i = random.randint(0, len(m)- 1)
+        m[i] = random.choice(VALID_CHARS)
+        message = ''.join(m)
+
+    return (Message(message), ) # Length 1 tuple, required by DEAP
 
 
 # -----------------------------------------------------------------------------
@@ -174,10 +193,10 @@ def evolve_string(text):
 
     # Collect statistics as the EA runs
     stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("avg", numpy.mean)
-    stats.register("std", numpy.std)
-    stats.register("min", numpy.min)
-    stats.register("max", numpy.max)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
 
     # Run simple EA
     # (See: http://deap.gel.ulaval.ca/doc/dev/api/algo.html for details)
@@ -205,6 +224,8 @@ if __name__ == "__main__":
     else:
         goal = " ".join(sys.argv[1:])
 
+    goal = goal.upper()
+
     # Verify that specified goal contains only known valid characters
     # (otherwise we'll never be able to evolve that string)
     for char in goal:
@@ -214,4 +235,4 @@ if __name__ == "__main__":
             raise ValueError(msg.format(goal=goal, char=char, val=VALID_CHARS))
 
     # Run evolutionary algorithm
-    pop, log = evolve_string(goal)
+pop, log = evolve_string(goal)
